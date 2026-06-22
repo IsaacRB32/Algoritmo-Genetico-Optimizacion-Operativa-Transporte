@@ -394,13 +394,13 @@ def imprimir_reporte(individuo: Individuo, aptitud: float) -> None:
 
         notas = []
         if not lic:
-            notas.append("⚠ LIC.VENCIDA")
+            notas.append("LIC.VENCIDA")
             LA_total += 1
         if est != "Disponible":
-            notas.append(f"⚠ {est.upper()}")
+            notas.append(f"{est.upper()}")
             DA_total += 1
 
-        lic_tag   = "✓" if lic else "✗"
+        lic_tag   = "SI" if lic else "NO"
         notas_str = "  ".join(notas) if notas else "OK"
 
         print(
