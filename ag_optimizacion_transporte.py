@@ -103,11 +103,11 @@ estado_unidades: Dict[str, str] = {
 }
 
 
-TAMANIO_POBLACION: int  = 50      # N  — individuos por generación
-GENERACIONES: int       = 200     # G  — condición de paro (máx. generaciones)
-TASA_CRUCE: float       = 0.80    # Pc — probabilidad de cruzamiento por pareja
-TASA_MUTACION: float    = 0.15    # Pm — probabilidad de mutación por individuo
-TAMANIO_TORNEO: int     = 3       # k  — tamaño del subconjunto para torneo
+TAMANIO_POBLACION: int  = 50     
+GENERACIONES: int       = 200     
+TASA_CRUCE: float       = 0.80 
+TASA_MUTACION: float    = 0.15
+TAMANIO_TORNEO: int     = 3
 
 # Coeficientes de ponderación de la función objetivo
 W1: float = 1.0      # Peso de la evaluación del recurso humano  Eop(o,s)
@@ -133,7 +133,7 @@ _LISTA_UNIDADES:   List[str] = list(catalogo_frd.keys())
 def crear_individuo(ordenes: List[str]) -> Individuo:
 
     n    = len(ordenes)
-    ops  = random.sample(_LISTA_OPERADORES, n)  # sin reemplazo → sin duplicados
+    ops  = random.sample(_LISTA_OPERADORES, n)
     unis = random.sample(_LISTA_UNIDADES,   n)
     return [(ordenes[i], ops[i], unis[i]) for i in range(n)]
 
@@ -150,8 +150,6 @@ def inicializar_poblacion(
 def evaluar_operador(op: str, os: str) -> float:
 
     ## Eop(o, s) = IER(o) × IC(s)
-
-
     return catalogo_ier[op] * catalogo_clientes[os]
 
 
@@ -162,15 +160,15 @@ def evaluar_unidad(uni: str, os: str) -> float:
 
 
 def calcular_penalizacion(individuo: Individuo) -> Tuple[float, int, int]:
-    """
-    ΩA = λD × DA + λL × LA
+    
+    ## ΩA = λD × DA + λL × LA
 
-    Contabiliza las violaciones de las reglas de negocio:
-      DA — Disponibilidad física: unidades con estatus ≠ "Disponible"
-           (En Mantenimiento, Taller Externo, Baja).
-      LA — Cumplimiento legal:    operadores con licencia/examen vencido
-           o inhabilitados (licencias_vigentes == False).
-    """
+    ##  Contabiliza las violaciones de las reglas de negocio:
+    ## DA — Disponibilidad física: unidades con estatus ≠ "Disponible"
+    ## (En Mantenimiento, Taller Externo, Baja).
+    ## LA — Cumplimiento legal:    operadores con licencia/examen vencido
+    ## o inhabilitados (licencias_vigentes == False).
+
 
     DA: int = 0
     LA: int = 0
