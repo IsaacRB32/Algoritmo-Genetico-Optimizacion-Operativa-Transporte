@@ -103,10 +103,6 @@ estado_unidades: Dict[str, str] = {
 }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECCIÓN 2 — PARÁMETROS DE CONTROL DEL ALGORITMO GENÉTICO
-# ─────────────────────────────────────────────────────────────────────────────
-
 TAMANIO_POBLACION: int  = 50      # N  — individuos por generación
 GENERACIONES: int       = 200     # G  — condición de paro (máx. generaciones)
 TASA_CRUCE: float       = 0.80    # Pc — probabilidad de cruzamiento por pareja
@@ -125,10 +121,6 @@ LAMBDA_D: float = 500.0    # λD — penalización por disponibilidad física
 LAMBDA_L: float = 1000.0   # λL — penalización por incumplimiento legal/documental
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECCIÓN 3 — TIPOS Y ESTRUCTURAS AUXILIARES
-# ─────────────────────────────────────────────────────────────────────────────
-
 # Tipo: cromosoma = lista ordenada de n tuplas (OS, OP, UNI)
 Individuo = List[Tuple[str, str, str]]
 
@@ -137,24 +129,9 @@ _LISTA_OPERADORES: List[str] = list(catalogo_ier.keys())
 _LISTA_UNIDADES:   List[str] = list(catalogo_frd.keys())
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECCIÓN 4 — PASO 1: INICIALIZACIÓN
-# ─────────────────────────────────────────────────────────────────────────────
 
 def crear_individuo(ordenes: List[str]) -> Individuo:
-    """
-    Construye un individuo (agenda diaria) asignando recursos mediante
-    muestreo aleatorio SIN reemplazo.
 
-    Garantía estructural: ningún operador ni ninguna unidad se repite
-    dentro de la misma agenda (restricción de exclusividad diaria).
-
-    Args:
-        ordenes: Lista de IDs de Órdenes de Servicio (s₁ … sₙ) del día.
-
-    Returns:
-        Individuo: lista de n tuplas [(s₁,o₁,u₁), …, (sₙ,oₙ,uₙ)].
-    """
     n    = len(ordenes)
     ops  = random.sample(_LISTA_OPERADORES, n)  # sin reemplazo → sin duplicados
     unis = random.sample(_LISTA_UNIDADES,   n)
@@ -165,57 +142,22 @@ def inicializar_poblacion(
     ordenes: List[str],
     tam: int = TAMANIO_POBLACION
 ) -> List[Individuo]:
-    """
-    Genera la población inicial de tamaño N mediante llamadas sucesivas
-    a crear_individuo(). Cada individuo es independiente (distinto muestreo).
 
-    Args:
-        ordenes: IDs de las Órdenes de Servicio del día.
-        tam:     Tamaño N de la población.
-
-    Returns:
-        Lista de N individuos (agendas diarias candidatas).
-    """
     return [crear_individuo(ordenes) for _ in range(tam)]
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECCIÓN 5 — PASO 2: EVALUACIÓN (Función Objetivo + Penalización Exterior)
-# ─────────────────────────────────────────────────────────────────────────────
 
 def evaluar_operador(op: str, os: str) -> float:
-    """
-    Eop(o, s) = IER(o) × IC(s)
 
-    Califica la calidad de emparejar el operador 'op' con el servicio 'os'.
-    El producto es alto únicamente cuando AMBOS factores son altos
-    simultáneamente: operador experimentado en servicio de alta importancia.
+    ## Eop(o, s) = IER(o) × IC(s)
 
-    Args:
-        op: ID del operador asignado.
-        os: ID de la Orden de Servicio.
 
-    Returns:
-        Valor escalar de evaluación del recurso humano.
-    """
     return catalogo_ier[op] * catalogo_clientes[os]
 
 
 def evaluar_unidad(uni: str, os: str) -> float:
-    """
-    Eun(u, s) = FR(u) × D(s)
-
-    Califica el ahorro potencial de combustible al asignar la unidad 'uni'
-    al servicio 'os'. El producto amplifica el beneficio de unidades
-    eficientes en rutas largas donde el ahorro de diésel es mayor.
-
-    Args:
-        uni: ID de la unidad vehicular asignada.
-        os:  ID de la Orden de Servicio.
-
-    Returns:
-        Valor escalar de evaluación del recurso mecánico.
-    """
+    
+    ## Eun(u, s) = FR(u) × D(s)
     return catalogo_frd[uni] * distancia_servicios[os]
 
 
@@ -228,20 +170,8 @@ def calcular_penalizacion(individuo: Individuo) -> Tuple[float, int, int]:
            (En Mantenimiento, Taller Externo, Baja).
       LA — Cumplimiento legal:    operadores con licencia/examen vencido
            o inhabilitados (licencias_vigentes == False).
-
-    Las soluciones infactibles no se descartan; reciben una reducción
-    proporcional de aptitud que disminuye su probabilidad de selección
-    (Método de Penalización Exterior).
-
-    Args:
-        individuo: Cromosoma a evaluar.
-
-    Returns:
-        Tupla (ΩA, DA, LA):
-            ΩA  — valor total de penalización.
-            DA  — contador de violaciones de disponibilidad física.
-            LA  — contador de violaciones legales/documentales.
     """
+
     DA: int = 0
     LA: int = 0
 
@@ -256,20 +186,7 @@ def calcular_penalizacion(individuo: Individuo) -> Tuple[float, int, int]:
 
 
 def calcular_aptitud(individuo: Individuo) -> float:
-    """
-    F(A) = BeneficioA − ΩA
 
-    BeneficioA = Σ_{(s,o,u) ∈ A} [ w1·Eop(o,s) + w2·Eun(u,s) ]
-
-    Función escalar que el Algoritmo Genético busca maximizar.
-    Un valor alto indica una agenda rentable Y operativamente válida.
-
-    Args:
-        individuo: Cromosoma (lista de tuplas) a evaluar.
-
-    Returns:
-        Aptitud F(A) del individuo.
-    """
     beneficio = sum(
         W1 * evaluar_operador(op, os) + W2 * evaluar_unidad(uni, os)
         for (os, op, uni) in individuo
@@ -278,71 +195,23 @@ def calcular_aptitud(individuo: Individuo) -> float:
     return beneficio - omega
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECCIÓN 6 — PASO 4: SELECCIÓN (Torneo Determinístico)
-# ─────────────────────────────────────────────────────────────────────────────
-
 def seleccion_torneo(
     poblacion: List[Individuo],
     aptitudes: List[float],
     k: int = TAMANIO_TORNEO
 ) -> Individuo:
-    """
-    Torneo Determinístico de tamaño k.
 
-    Extrae aleatoriamente k individuos de la población y retorna una copia
-    del que posea la mayor aptitud F(A). Al ser determinístico, siempre
-    gana el mejor del subconjunto: no intervienen probabilidades adicionales.
-
-    Ventaja para este modelo: los individuos infactibles con penalizaciones
-    acumuladas perderán consistentemente, guiando la búsqueda hacia la
-    región de soluciones válidas de forma natural y automática.
-
-    Args:
-        poblacion: Individuos de la generación actual.
-        aptitudes: Vector de aptitudes F(A) correspondiente a cada individuo.
-        k:         Tamaño del torneo (subconjunto competidor).
-
-    Returns:
-        Copia profunda del individuo ganador (mayor aptitud del torneo).
-    """
     competidores = random.sample(range(len(poblacion)), k)
     ganador      = max(competidores, key=lambda i: aptitudes[i])
     return copy.deepcopy(poblacion[ganador])
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SECCIÓN 7 — PASO 5: CRUZAMIENTO + REPARACIÓN ESTRUCTURAL
-# ─────────────────────────────────────────────────────────────────────────────
 
 def _reparar_recurso(
     individuo: List[Tuple[str, str, str]],
     catalogo:  List[str],
     pos:       int
 ) -> List[Tuple[str, str, str]]:
-    """
-    Mecanismo de reparación de duplicados para un tipo de recurso.
 
-    Detecta posiciones con recursos repetidos en el cromosoma y los
-    sustituye con recursos libres del catálogo, restaurando la restricción
-    de exclusividad diaria (cada recurso aparece a lo sumo una vez).
-
-    Algoritmo:
-        1. Primera pasada: identificar duplicados y construir conjunto de
-           recursos ya asignados.
-        2. Calcular conjunto de recursos libres (catálogo − asignados).
-        3. Segunda pasada: reemplazar cada duplicado con un recurso libre
-           elegido al azar.
-
-    Args:
-        individuo: Cromosoma mutable sobre el que se opera.
-        catalogo:  Lista completa de IDs del catálogo del recurso a reparar
-                   (_LISTA_OPERADORES para pos=1, _LISTA_UNIDADES para pos=2).
-        pos:       Posición del recurso dentro de la tupla (1=OP, 2=UNI).
-
-    Returns:
-        Individuo con duplicados corregidos (misma referencia de lista).
-    """
     asignados:  set  = set()
     duplicados: List[int] = []
 
@@ -377,25 +246,7 @@ def cruzamiento_uniforme(
     padre1: Individuo,
     padre2: Individuo
 ) -> Tuple[Individuo, Individuo]:
-    """
-    Cruzamiento Uniforme con herencia íntegra de tupla.
 
-    Para cada posición i ∈ [0, n) se lanza una moneda (P=0.5) y se decide
-    si hijo1 hereda la tupla de padre1 o de padre2 (hijo2 hereda la opuesta).
-    La TUPLA COMPLETA se transfiere de forma indivisible, preservando el
-    acoplamiento operador-unidad construido en generaciones anteriores.
-
-    Inmediatamente después del cruce se ejecuta la verificación estructural:
-    se reparan duplicados de operadores y de unidades de forma independiente,
-    garantizando que cada recurso aparezca a lo sumo una vez en la agenda.
-
-    Args:
-        padre1: Primer progenitor.
-        padre2: Segundo progenitor.
-
-    Returns:
-        (hijo1, hijo2): par de descendientes reparados y listos para evaluación.
-    """
     n = len(padre1)
     hijo1: List[Tuple[str, str, str]] = []
     hijo2: List[Tuple[str, str, str]] = []
@@ -419,42 +270,20 @@ def cruzamiento_uniforme(
     return hijo1, hijo2
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECCIÓN 8 — PASO 6: MUTACIÓN (Reinicio Aleatorio Puro)
-# ─────────────────────────────────────────────────────────────────────────────
-
 def mutacion_reinicio_aleatorio(individuo: Individuo) -> Individuo:
-    """
-    Mutación por Reinicio Aleatorio (Random Resetting).
 
-    Selecciona una tupla al azar y reemplaza su OPERADOR o su UNIDAD por
-    un recurso completamente nuevo extraído del catálogo general, inyectando
-    material genético externo al individuo para evitar óptimos locales.
-
-    Validación aplicada (solo estructural):
-      ✓ El nuevo recurso no duplica a ningún otro ya presente en la agenda.
-      ✗ NO se pre-valida estatus legal u operativo del recurso inyectado.
-        Esta validación se delega al Paso 2 (función de penalización) en la
-        siguiente generación, justificando matemáticamente la existencia de λD y λL.
-
-    Args:
-        individuo: Cromosoma a mutar.
-
-    Returns:
-        Nuevo cromosoma con la mutación aplicada (lista nueva).
-    """
     mutado = list(individuo)         # copia superficial de la lista de tuplas
     idx    = random.randrange(len(mutado))
     s, op, uni = mutado[idx]
 
     if random.randint(0, 1) == 0:
-        # --- Mutar el OPERADOR ---
+        ## Mutar el OPERADOR 
         ops_ocupados = {t[1] for t in mutado} - {op}   # excluir el actual
         candidatos   = [o for o in _LISTA_OPERADORES if o not in ops_ocupados]
         if candidatos:
             mutado[idx] = (s, random.choice(candidatos), uni)
     else:
-        # --- Mutar la UNIDAD ---
+        ## Mutar la UNIDAD
         unis_ocupadas = {t[2] for t in mutado} - {uni}  # excluir la actual
         candidatos    = [u for u in _LISTA_UNIDADES if u not in unis_ocupadas]
         if candidatos:
@@ -462,10 +291,6 @@ def mutacion_reinicio_aleatorio(individuo: Individuo) -> Individuo:
 
     return mutado
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SECCIÓN 9 — ALGORITMO GENÉTICO COMPLETO (Pasos 1–7)
-# ─────────────────────────────────────────────────────────────────────────────
 
 def algoritmo_genetico(
     ordenes:       List[str],
@@ -476,38 +301,7 @@ def algoritmo_genetico(
     k_torneo:      int   = TAMANIO_TORNEO,
     verbose:       bool  = True
 ) -> Tuple[Individuo, float, List[float]]:
-    """
-    Ejecuta el Algoritmo Genético para la asignación óptima de recursos
-    en la programación de servicios de transporte.
 
-    ┌─ Flujo evolutivo ────────────────────────────────────────────────────┐
-    │  1. Inicialización  → población aleatoria sin duplicados             │
-    │  2. Evaluación      → F(A) = Σ(w1·Eop + w2·Eun) − ΩA               │
-    │  3. Elitismo        → copiar y preservar el mejor individuo          │
-    │  4. Selección       → torneo determinístico de tamaño k              │
-    │  5. Cruzamiento     → uniforme por tupla + reparación estructural    │
-    │  6. Mutación        → reinicio aleatorio puro (sin pre-validación)   │
-    │  7. Reemplazo       → generacional extintivo + élite                 │
-    │     └─ ¿Gen < G? → volver a Paso 2   |   ¿Gen = G? → retornar      │
-    └──────────────────────────────────────────────────────────────────────┘
-
-    Args:
-        ordenes:       IDs de las Órdenes de Servicio del día a programar.
-        tam_poblacion: Tamaño N de la población.
-        generaciones:  Número máximo de generaciones (condición de paro).
-        tasa_cruce:    Probabilidad Pc de aplicar cruzamiento a una pareja.
-        tasa_mutacion: Probabilidad Pm de mutar un individuo descendiente.
-        k_torneo:      Tamaño k del torneo de selección de padres.
-        verbose:       Imprimir progreso cada 10 generaciones si es True.
-
-    Returns:
-        Tupla (mejor_individuo, mejor_aptitud, historial):
-          mejor_individuo — Agenda óptima encontrada (cromosoma completo).
-          mejor_aptitud   — Valor máximo de F(A) alcanzado en toda la ejecución.
-          historial       — Lista con el F(A) máximo por cada generación
-                            (curva de convergencia del algoritmo).
-    """
-    # ── PASO 1: Inicialización ──────────────────────────────────────────────
     poblacion: List[Individuo] = inicializar_poblacion(ordenes, tam_poblacion)
 
     mejor_individuo: Optional[Individuo] = None
@@ -516,10 +310,8 @@ def algoritmo_genetico(
 
     for gen in range(generaciones):
 
-        # ── PASO 2: Evaluación ─────────────────────────────────────────────
         aptitudes: List[float] = [calcular_aptitud(ind) for ind in poblacion]
 
-        # ── PASO 3: Elitismo ───────────────────────────────────────────────
         # Identificar el mejor individuo de la generación actual y resguardarlo
         idx_elite  = max(range(tam_poblacion), key=lambda i: aptitudes[i])
         elite      = copy.deepcopy(poblacion[idx_elite])
@@ -537,18 +329,16 @@ def algoritmo_genetico(
                   f"Élite actual: {apt_elite:>10.4f}  │  "
                   f"Mejor global: {mejor_aptitud:>10.4f}")
 
-        # ── PASOS 4, 5, 6: Reproducción ────────────────────────────────────
         # El élite ocupa la primera plaza (elitismo). Se producen (N-1)
-        # descendientes adicionales mediante selección → cruce → mutación.
         nueva_poblacion: List[Individuo] = [elite]
 
         while len(nueva_poblacion) < tam_poblacion:
 
-            # Paso 4 — Selección de dos progenitores por torneo determinístico
+            # Selección de dos progenitores por torneo determinístico
             padre1 = seleccion_torneo(poblacion, aptitudes, k_torneo)
             padre2 = seleccion_torneo(poblacion, aptitudes, k_torneo)
 
-            # Paso 5 — Cruzamiento uniforme con reparación estructural
+            # Cruzamiento uniforme
             if random.random() < tasa_cruce:
                 hijo1, hijo2 = cruzamiento_uniforme(padre1, padre2)
             else:
@@ -556,7 +346,7 @@ def algoritmo_genetico(
                 hijo1 = copy.deepcopy(padre1)
                 hijo2 = copy.deepcopy(padre2)
 
-            # Paso 6 — Mutación por reinicio aleatorio puro
+            # Mutación por reinicio aleatorio
             if random.random() < tasa_mutacion:
                 hijo1 = mutacion_reinicio_aleatorio(hijo1)
             if random.random() < tasa_mutacion:
@@ -566,28 +356,13 @@ def algoritmo_genetico(
             if len(nueva_poblacion) < tam_poblacion:
                 nueva_poblacion.append(hijo2)
 
-        # ── PASO 7: Reemplazo generacional extintivo ───────────────────────
-        # Toda la generación anterior se reemplaza por la nueva descendencia.
-        # El élite, ya insertado en nueva_poblacion[0], actúa como escudo.
         poblacion = nueva_poblacion
 
     return mejor_individuo, mejor_aptitud, historial
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECCIÓN 10 — REPORTE DE RESULTADOS
-# ─────────────────────────────────────────────────────────────────────────────
-
 def imprimir_reporte(individuo: Individuo, aptitud: float) -> None:
-    """
-    Imprime un reporte tabular detallado de la mejor agenda logística
-    encontrada por el algoritmo, con métricas individuales por servicio
-    y un resumen global de beneficio, penalización y aptitud neta.
 
-    Args:
-        individuo: Mejor cromosoma retornado por el AG.
-        aptitud:   Aptitud F(A) del individuo.
-    """
     SEP_D = "─" * 104
     SEP_D2 = "═" * 104
 
@@ -646,13 +421,7 @@ def imprimir_reporte(individuo: Individuo, aptitud: float) -> None:
 
 
 def imprimir_convergencia(historial: List[float]) -> None:
-    """
-    Imprime un resumen de la curva de convergencia del AG, mostrando
-    el valor de F(A) máximo en cinco puntos clave de la ejecución.
 
-    Args:
-        historial: Lista de aptitudes máximas por generación.
-    """
     g = len(historial)
     print("  CURVA DE CONVERGENCIA DEL ALGORITMO:")
     print(f"  {'Generación':^12}  {'F(A) Máxima':^16}")
@@ -664,11 +433,6 @@ def imprimir_convergencia(historial: List[float]) -> None:
 
     mejora = historial[-1] - historial[0]
     print(f"\n  Mejora total (Gen 1 → Gen {g}): {mejora:+.4f}\n")
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SECCIÓN 11 — PUNTO DE ENTRADA
-# ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
 
