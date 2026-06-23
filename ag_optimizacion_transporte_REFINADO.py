@@ -89,8 +89,8 @@ EUN_MAX: float = 5.2  * 1500   #  max(FRD) x max(D)
 
 # Coeficientes de ponderacion
 # w1 + w2 = 1.0: pesos proporcionales directos sobre criterios normalizados
-W1: float = 0.6   # % de peso del criterio humano
-W2: float = 0.4   # % depeso del criterio mecanico 
+W1: float = 0.3   # % de peso del criterio humano
+W2: float = 0.7   # % depeso del criterio mecanico 
 
 # Coeficientes de penalizacion exterior (escala normalizada: max beneficio aprox 20)
 LAMBDA_D: float = 5.0    # penalizacion por disponibilidad fisica
@@ -258,7 +258,6 @@ def mutacion_reinicio_aleatorio(individuo: Individuo) -> Individuo:
 
 
 def mutacion_intercambio(individuo: Individuo) -> Individuo:
-
     mutado = list(individuo)
     n = len(mutado)
 
@@ -268,12 +267,15 @@ def mutacion_intercambio(individuo: Individuo) -> Individuo:
     s1, op1, uni1 = mutado[idx1]
     s2, op2, uni2 = mutado[idx2]
 
-    # Intercambiar solo los operadores; las unidades no se tocan
-    mutado[idx1] = (s1, op2, uni1)
-    mutado[idx2] = (s2, op1, uni2)
+    # 50% de probabilidad de intercambiar operadores, 50% de intercambiar unidades
+    if random.random() < 0.5:
+        mutado[idx1] = (s1, op2, uni1)  # Swap de operadores
+        mutado[idx2] = (s2, op1, uni2)
+    else:
+        mutado[idx1] = (s1, op1, uni2)  # Swap de unidades
+        mutado[idx2] = (s2, op2, uni1)
 
     return mutado
-
 def algoritmo_genetico(
     ordenes:       List[str],
     tam_poblacion: int   = TAMANIO_POBLACION,
